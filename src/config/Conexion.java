@@ -1,3 +1,5 @@
+package config;
+
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -9,6 +11,7 @@ public class Conexion {
 
     private static final String USUARIO = "root";
 
+    // Después configuraremos la contraseña de forma segura.
     private static final String CLAVE = "Sandra1224$";
 
     public static Connection conectar() {

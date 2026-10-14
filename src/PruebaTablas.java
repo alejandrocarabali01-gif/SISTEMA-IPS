@@ -3,6 +3,8 @@ import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
+import config.Conexion;
+
 public class PruebaTablas {
 
     public static void main(String[] args) {

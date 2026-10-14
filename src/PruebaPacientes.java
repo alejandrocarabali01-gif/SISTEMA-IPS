@@ -1,3 +1,5 @@
+import dao.PacienteDAO;
+
 public class PruebaPacientes {
 
     public static void main(String[] args) {
