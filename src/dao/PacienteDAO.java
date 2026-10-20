@@ -26,6 +26,7 @@ public class PacienteDAO {
             ps.setString(4, p.correo());
             asignarFecha(ps, 5, p);
             ps.executeUpdate();
+            renumerar(con);
         }
     }
 
@@ -75,6 +76,18 @@ public class PacienteDAO {
 
     public List<Paciente> listar() throws SQLException {
         return buscar("");
+    }
+
+
+    /**
+     * Un INSERT fallido (por ejemplo, una identificacion duplicada) consume un numero del
+     * autoincremental y dejaria un salto en los IDs. Tras cada guardado exitoso se renumera
+     * para que los IDs queden consecutivos.
+     */
+    private void renumerar(Connection con) throws SQLException {
+        try (CallableStatement cs = con.prepareCall("{CALL sp_renumerar_pacientes()}")) {
+            cs.execute();
+        }
     }
 
     private void asignarFecha(PreparedStatement ps, int indice, Paciente p) throws SQLException {

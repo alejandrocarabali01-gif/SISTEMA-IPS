@@ -10,6 +10,7 @@ import java.awt.FlowLayout;
 import java.awt.Font;
 import java.sql.SQLException;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
@@ -25,6 +26,7 @@ import javax.swing.table.DefaultTableModel;
 
 /** Pantalla "Gestión de pacientes" (RF01 - RF04). */
 public class PanelPacientes extends JPanel implements Refrescable {
+    private static final DateTimeFormatter FORMATO_FECHA = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private final PacienteDAO dao = new PacienteDAO();
     private final Consumer<String> mensaje;
 
@@ -36,7 +38,7 @@ public class PanelPacientes extends JPanel implements Refrescable {
     private final CampoTexto txtBuscar = new CampoTexto("Nombre o identificación");
 
     private final DefaultTableModel modelo = new DefaultTableModel(
-            new String[]{"ID", "Identificación", "Nombre completo", "Teléfono", "Correo"}, 0) {
+            new String[]{"ID", "Identificación", "Nombre completo", "Teléfono", "Correo", "Fecha de nacimiento"}, 0) {
         @Override
         public boolean isCellEditable(int fila, int columna) {
             return false;
@@ -58,6 +60,7 @@ public class PanelPacientes extends JPanel implements Refrescable {
         Tema.agregar(caja, tarjetaFormulario(), 16);
         Tema.agregar(caja, tarjetaDirectorio(), 0);
         add(Tema.pagina(caja), BorderLayout.CENTER);
+        txtFecha.setLimites(false, true);
 
         tabla.getSelectionModel().addListSelectionListener(e -> {
             if (e.getValueIsAdjusting() || cargando) {
@@ -236,7 +239,8 @@ public class PanelPacientes extends JPanel implements Refrescable {
         cargando = true;
         modelo.setRowCount(0);
         for (Paciente p : datos) {
-            modelo.addRow(new Object[]{p.id(), p.identificacion(), p.nombreCompleto(), p.telefono(), p.correo()});
+            modelo.addRow(new Object[]{p.id(), p.identificacion(), p.nombreCompleto(), p.telefono(), p.correo(),
+                p.fechaNacimiento() == null ? "" : p.fechaNacimiento().format(FORMATO_FECHA)});
         }
         cargando = false;
         lblTotal.setText("Pacientes encontrados: " + datos.size());
@@ -255,7 +259,7 @@ public class PanelPacientes extends JPanel implements Refrescable {
         mensaje.accept("Paciente seleccionado: " + p.nombreCompleto() + ". Puede modificar o eliminar el registro.");
     }
 
-    /** Valida los campos obligatorios y los formatos (RN07). Devuelve null si algo falla. */
+    /** Valida campos obligatorios, formatos y reglas de dominio (RN07, RN08 - RN12). Devuelve null si algo falla. */
     private Paciente leer(int id) {
         String ident = txtIdentificacion.getText().trim();
         String nombre = txtNombre.getText().trim();
@@ -266,18 +270,24 @@ public class PanelPacientes extends JPanel implements Refrescable {
                     + "teléfono y correo.");
             return null;
         }
-        if (!Validador.numero(ident, 5, 15)) {
-            Dialogos.aviso(this, "La identificación debe contener solo números (entre 5 y 15 dígitos).");
+        if (!Validador.numero(ident, 5, 16)) {
+            Dialogos.aviso(this, "La identificación debe contener solo números, entre 5 y 16 dígitos.");
             txtIdentificacion.requestFocusInWindow();
             return null;
         }
+        if (!Validador.nombre(nombre)) {
+            Dialogos.aviso(this, "El nombre solo puede contener letras y espacios (sin números ni símbolos), "
+                    + "máximo 100 caracteres.");
+            txtNombre.requestFocusInWindow();
+            return null;
+        }
         if (!Validador.numero(tel, 7, 15)) {
-            Dialogos.aviso(this, "El teléfono debe contener solo números (entre 7 y 15 dígitos).");
+            Dialogos.aviso(this, "El teléfono debe contener solo números, entre 7 y 15 dígitos.");
             txtTelefono.requestFocusInWindow();
             return null;
         }
         if (!Validador.correo(correo)) {
-            Dialogos.aviso(this, "El correo electrónico no tiene un formato válido (ejemplo: nombre@correo.com).");
+            Dialogos.aviso(this, "El correo no es válido. Use un correo de un proveedor reconocido (por ejemplo gmail.com, hotmail.com, outlook.com o un correo institucional .edu.co), máximo 100 caracteres.");
             txtCorreo.requestFocusInWindow();
             return null;
         }
@@ -285,11 +295,19 @@ public class PanelPacientes extends JPanel implements Refrescable {
         if (!txtFecha.getText().isBlank()) {
             fecha = txtFecha.getFecha();
             if (fecha == null) {
-                Dialogos.aviso(this, "La fecha de nacimiento no es válida. Use el formato dd/mm/aaaa.");
+                Dialogos.aviso(this, "La fecha de nacimiento no es válida. Use el formato dd/mm/aaaa con una fecha real.");
+                txtFecha.requestFocusInWindow();
                 return null;
             }
-            if (fecha.isAfter(LocalDate.now())) {
+            if (!Validador.noEsFutura(fecha)) {
                 Dialogos.aviso(this, "La fecha de nacimiento no puede ser posterior a hoy.");
+                txtFecha.requestFocusInWindow();
+                return null;
+            }
+            if (!Validador.edadRealista(fecha)) {
+                Dialogos.aviso(this, "La fecha de nacimiento no es realista: la edad no puede superar "
+                        + Validador.EDAD_MAXIMA + " años.");
+                txtFecha.requestFocusInWindow();
                 return null;
             }
         }

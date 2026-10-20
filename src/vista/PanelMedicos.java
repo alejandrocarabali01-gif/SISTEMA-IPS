@@ -274,6 +274,7 @@ public class PanelMedicos extends JPanel implements Refrescable {
         return Normalizer.normalize(s, Normalizer.Form.NFD).replaceAll("\\p{M}", "").trim().toLowerCase();
     }
 
+    /** Valida campos obligatorios, formatos y reglas de dominio (RN07, RN08 - RN11). Devuelve null si algo falla. */
     private Medico leer(int id) {
         String ident = txtIdentificacion.getText().trim();
         String nombre = txtNombre.getText().trim();
@@ -285,18 +286,24 @@ public class PanelMedicos extends JPanel implements Refrescable {
                     + "especialidad, teléfono y correo.");
             return null;
         }
-        if (!Validador.numero(ident, 5, 15)) {
-            Dialogos.aviso(this, "La identificación debe contener solo números (entre 5 y 15 dígitos).");
+        if (!Validador.numero(ident, 5, 16)) {
+            Dialogos.aviso(this, "La identificación debe contener solo números, entre 5 y 16 dígitos.");
             txtIdentificacion.requestFocusInWindow();
             return null;
         }
+        if (!Validador.nombre(nombre)) {
+            Dialogos.aviso(this, "El nombre solo puede contener letras y espacios (sin números ni símbolos), "
+                    + "máximo 100 caracteres.");
+            txtNombre.requestFocusInWindow();
+            return null;
+        }
         if (!Validador.numero(tel, 7, 15)) {
-            Dialogos.aviso(this, "El teléfono debe contener solo números (entre 7 y 15 dígitos).");
+            Dialogos.aviso(this, "El teléfono debe contener solo números, entre 7 y 15 dígitos.");
             txtTelefono.requestFocusInWindow();
             return null;
         }
         if (!Validador.correo(correo)) {
-            Dialogos.aviso(this, "El correo electrónico no tiene un formato válido (ejemplo: nombre@correo.com).");
+            Dialogos.aviso(this, "El correo no es válido. Use un correo de un proveedor reconocido (por ejemplo gmail.com, hotmail.com, outlook.com o un correo institucional .edu.co), máximo 100 caracteres.");
             txtCorreo.requestFocusInWindow();
             return null;
         }

@@ -24,6 +24,7 @@ public class MedicoDAO {
             ps.setString(4, m.telefono());
             ps.setString(5, m.correo());
             ps.executeUpdate();
+            renumerar(con);
         }
     }
 
@@ -72,5 +73,16 @@ public class MedicoDAO {
 
     public List<Medico> listar() throws SQLException {
         return buscar("");
+    }
+
+    /**
+     * Un INSERT fallido (por ejemplo, una identificacion duplicada) consume un numero del
+     * autoincremental y dejaria un salto en los IDs. Tras cada guardado exitoso se renumera
+     * para que los IDs queden consecutivos.
+     */
+    private void renumerar(Connection con) throws SQLException {
+        try (CallableStatement cs = con.prepareCall("{CALL sp_renumerar_medicos()}")) {
+            cs.execute();
+        }
     }
 }

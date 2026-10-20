@@ -38,6 +38,10 @@ public class CampoFecha extends CampoTexto {
             DateTimeFormatter.ofPattern("dd/MM/uuuu").withResolverStyle(ResolverStyle.STRICT);
     private static final int ZONA_ICONO = 34;
 
+    private boolean noPasadas = false;
+    private boolean noFuturas = false;
+    private boolean maxUnAnio = false;
+
     public CampoFecha() {
         super("dd/mm/aaaa");
         setBorder(BorderFactory.createCompoundBorder(
@@ -58,6 +62,17 @@ public class CampoFecha extends CampoTexto {
                         e.getX() > getWidth() - ZONA_ICONO ? Cursor.HAND_CURSOR : Cursor.TEXT_CURSOR));
             }
         });
+    }
+
+    /** Bloquea en el calendario los dias anteriores a hoy y/o posteriores a hoy. */
+    public void setLimites(boolean noPasadas, boolean noFuturas) {
+        this.noPasadas = noPasadas;
+        this.noFuturas = noFuturas;
+    }
+
+    /** Bloquea en el calendario los dias posteriores a un año desde hoy (citas). */
+    public void setMaximoUnAnio(boolean maxUnAnio) {
+        this.maxUnAnio = maxUnAnio;
     }
 
     /** Devuelve la fecha escrita o null si esta vacia o no es valida. */
@@ -84,7 +99,7 @@ public class CampoFecha extends CampoTexto {
         LocalDate base = getFecha() != null ? getFecha() : LocalDate.now();
         JPopupMenu menu = new JPopupMenu();
         menu.setBorder(new LineBorder(Tema.BORDE_CAMPO));
-        menu.add(new PanelCalendario(base, f -> {
+        menu.add(new PanelCalendario(base, noPasadas, noFuturas, maxUnAnio, f -> {
             setFecha(f);
             menu.setVisible(false);
         }));
@@ -108,14 +123,35 @@ public class CampoFecha extends CampoTexto {
             Document doc = fb.getDocument();
             String actual = doc.getText(0, doc.getLength());
             String resultado = actual.substring(0, off) + nuevo + actual.substring(off + len);
-            if (resultado.length() > 10) {
-                return;
-            }
-            boolean alFinal = off + len == actual.length();
-            if (alFinal && !nuevo.isEmpty() && (resultado.length() == 2 || resultado.length() == 5)) {
-                resultado += "/";
+            if (nuevo.length() > 1) {
+                // Texto pegado o asignado completo: se normaliza a dd/mm/aaaa
+                String digitos = resultado.replaceAll("[^0-9]", "");
+                if (digitos.length() > 8) {
+                    return;
+                }
+                resultado = formatear(digitos);
+            } else {
+                if (resultado.length() > 10) {
+                    return;
+                }
+                boolean alFinal = off + len == actual.length();
+                if (alFinal && !nuevo.isEmpty() && (resultado.length() == 2 || resultado.length() == 5)) {
+                    resultado += "/";
+                }
             }
             super.replace(fb, 0, doc.getLength(), resultado, a);
+        }
+
+        /** "15052000" -> "15/05/2000" (formatea de forma progresiva). */
+        private static String formatear(String d) {
+            StringBuilder sb = new StringBuilder(d.substring(0, Math.min(2, d.length())));
+            if (d.length() > 2) {
+                sb.append('/').append(d, 2, Math.min(4, d.length()));
+            }
+            if (d.length() > 4) {
+                sb.append('/').append(d.substring(4));
+            }
+            return sb.toString();
         }
     }
 
@@ -123,12 +159,19 @@ public class CampoFecha extends CampoTexto {
     private static class PanelCalendario extends JPanel {
         private YearMonth mes;
         private final Consumer<LocalDate> alElegir;
+        private final boolean noPasadas;
+        private final boolean noFuturas;
+        private final boolean maxUnAnio;
         private final JLabel titulo = new JLabel("", SwingConstants.CENTER);
         private final JPanel dias = new JPanel(new GridLayout(7, 7, 2, 2));
 
-        PanelCalendario(LocalDate base, Consumer<LocalDate> alElegir) {
+        PanelCalendario(LocalDate base, boolean noPasadas, boolean noFuturas, boolean maxUnAnio,
+                        Consumer<LocalDate> alElegir) {
             super(new BorderLayout(0, 6));
             this.alElegir = alElegir;
+            this.noPasadas = noPasadas;
+            this.noFuturas = noFuturas;
+            this.maxUnAnio = maxUnAnio;
             this.mes = YearMonth.from(base);
             setBackground(Color.WHITE);
             setBorder(new EmptyBorder(8, 8, 8, 8));
@@ -192,7 +235,14 @@ public class CampoFecha extends CampoTexto {
                     b.setForeground(Tema.VERDE);
                     b.setFont(Tema.f(Font.BOLD, 11));
                 }
-                b.addActionListener(e -> alElegir.accept(fecha));
+                boolean bloqueado = (noPasadas && fecha.isBefore(LocalDate.now()))
+                        || (noFuturas && fecha.isAfter(LocalDate.now()))
+                        || (maxUnAnio && fecha.isAfter(LocalDate.now().plusYears(1)));
+                if (bloqueado) {
+                    b.setEnabled(false);
+                } else {
+                    b.addActionListener(e -> alElegir.accept(fecha));
+                }
                 dias.add(b);
             }
             int total = desfase + mes.lengthOfMonth();

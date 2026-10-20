@@ -30,12 +30,14 @@ public class CitaDAO {
             ps.setTime(4, Time.valueOf(c.hora()));
             ps.setString(5, c.motivo());
             ps.executeUpdate();
-            ordenarIds(con);
+            renumerar(con);
         }
     }
 
-    public void actualizar(Cita c) throws SQLException {
-        String sql = "UPDATE cita SET id_paciente = ?, id_medico = ?, fecha = ?, hora = ?, motivo = ? WHERE id = ?";
+    /** Solo se puede modificar una cita PROGRAMADA. Devuelve false si ya no lo esta. */
+    public boolean actualizar(Cita c) throws SQLException {
+        String sql = "UPDATE cita SET id_paciente = ?, id_medico = ?, fecha = ?, hora = ?, motivo = ? "
+                + "WHERE id = ? AND estado = 'PROGRAMADA'";
         try (Connection con = ConexionDB.getConexion(); PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setInt(1, c.idPaciente());
             ps.setInt(2, c.idMedico());
@@ -43,25 +45,24 @@ public class CitaDAO {
             ps.setTime(4, Time.valueOf(c.hora()));
             ps.setString(5, c.motivo());
             ps.setInt(6, c.id());
-            ps.executeUpdate();
-            ordenarIds(con);
+            boolean modificada = ps.executeUpdate() > 0;
+            if (modificada) {
+                renumerar(con);
+            }
+            return modificada;
         }
     }
 
-    /** Renumera los IDs siguiendo el orden de la agenda (fecha y hora). */
-    private void ordenarIds(Connection con) throws SQLException {
-        try (CallableStatement cs = con.prepareCall("{CALL sp_renumerar_citas()}")) {
-            cs.execute();
-        }
-    }
-
-    /** Cancelar (RF12) o marcar atendida (RF13). Usar las constantes de EstadoCita. */
-    public void cambiarEstado(int id, String estado) throws SQLException {
-        try (Connection con = ConexionDB.getConexion();
-             PreparedStatement ps = con.prepareStatement("UPDATE cita SET estado = ? WHERE id = ?")) {
+    /**
+     * Cancelar (RF12) o marcar atendida (RF13). Solo se permite el cambio desde PROGRAMADA:
+     * una cita Atendida o Cancelada no vuelve a cambiar. Devuelve false si no se pudo cambiar.
+     */
+    public boolean cambiarEstado(int id, String estado) throws SQLException {
+        String sql = "UPDATE cita SET estado = ? WHERE id = ? AND estado = 'PROGRAMADA'";
+        try (Connection con = ConexionDB.getConexion(); PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setString(1, estado);
             ps.setInt(2, id);
-            ps.executeUpdate();
+            return ps.executeUpdate() > 0;
         }
     }
 
@@ -120,5 +121,16 @@ public class CitaDAO {
             }
         }
         return horas;
+    }
+
+    /**
+     * Los IDs de las citas siguen el orden de la agenda (fecha y hora): la cita mas cercana es la 1.
+     * Se renumera tras cada guardado o modificacion, porque ambos pueden cambiar el orden
+     * (y un INSERT fallido tambien dejaria saltos en el autoincremental).
+     */
+    private void renumerar(Connection con) throws SQLException {
+        try (CallableStatement cs = con.prepareCall("{CALL sp_renumerar_citas()}")) {
+            cs.execute();
+        }
     }
 }

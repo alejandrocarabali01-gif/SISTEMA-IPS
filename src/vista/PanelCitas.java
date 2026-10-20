@@ -7,6 +7,7 @@ import modelo.Cita;
 import modelo.EstadoCita;
 import modelo.Medico;
 import modelo.Paciente;
+import util.Validador;
 
 import java.awt.BorderLayout;
 import java.awt.Component;
@@ -65,18 +66,20 @@ public class PanelCitas extends JPanel implements Refrescable {
     private List<Cita> datos = new ArrayList<>();
     private Integer seleccionado = null;
     private String estadoSeleccionado = null;
+    private LocalDate fechaSeleccionada = null;
+    private LocalTime horaPropia = null;
     private boolean ajustando = false;
 
     /** Hora de la lista desplegable; si esta ocupada se muestra pero no se puede elegir. */
-    private record Franja(LocalTime hora, boolean ocupada) implements Deshabilitable {
+    private record Franja(LocalTime hora, boolean ocupada, boolean pasada) implements Deshabilitable {
         @Override
         public boolean deshabilitado() {
-            return ocupada;
+            return ocupada || pasada;
         }
 
         @Override
         public String toString() {
-            return FORMATO_HORA.format(hora) + (ocupada ? "   (ocupada)" : "");
+            return FORMATO_HORA.format(hora) + (ocupada ? "   (ocupada)" : pasada ? "   (no disponible)" : "");
         }
     }
 
@@ -92,6 +95,8 @@ public class PanelCitas extends JPanel implements Refrescable {
         Tema.agregar(caja, tarjetaFormulario(), 16);
         Tema.agregar(caja, tarjetaAgenda(), 0);
         add(Tema.pagina(caja), BorderLayout.CENTER);
+        txtFecha.setLimites(true, false);
+        txtFecha.setMaximoUnAnio(true);
 
         tabla.getColumnModel().getColumn(6).setCellRenderer(new RenderEstado());
         tabla.getColumnModel().getColumn(0).setMaxWidth(60);
@@ -288,9 +293,15 @@ public class PanelCitas extends JPanel implements Refrescable {
                 Dialogos.error(this, "No se pudo consultar la disponibilidad:\n" + e.getMessage());
             }
         }
+        LocalDate hoy = LocalDate.now();
+        LocalTime ahora = LocalTime.now();
         List<Franja> franjas = new ArrayList<>();
         for (LocalTime h = LocalTime.of(8, 0); !h.isAfter(LocalTime.of(17, 0)); h = h.plusMinutes(30)) {
-            franjas.add(new Franja(h, ocupadas.contains(h)));
+            boolean propia = h.equals(horaPropia);
+            boolean pasada = !propia && fecha != null
+                    && (fecha.isBefore(hoy) || (fecha.equals(hoy) && h.isBefore(ahora))
+                        || fecha.isAfter(hoy.plusYears(1)));
+            franjas.add(new Franja(h, !propia && ocupadas.contains(h), pasada));
         }
         boolean anterior = ajustando;
         ajustando = true;
@@ -298,13 +309,17 @@ public class PanelCitas extends JPanel implements Refrescable {
         if (previa != null) {
             for (int i = 1; i < cmbHora.getItemCount(); i++) {
                 Franja f = (Franja) cmbHora.getItemAt(i);
-                if (f.hora().equals(previa) && !f.ocupada()) {
+                if (f.hora().equals(previa) && !f.deshabilitado()) {
                     cmbHora.setSelectedIndex(i);
                 }
             }
         }
         ajustando = anterior;
-        if (!ocupadas.isEmpty()) {
+        if (fecha != null && fecha.isBefore(hoy)) {
+            mensaje.accept("No se pueden programar citas en fechas pasadas. Elija hoy o una fecha futura.");
+        } else if (fecha != null && fecha.isAfter(hoy.plusYears(1))) {
+            mensaje.accept("Solo se pueden programar citas hasta un año hacia adelante.");
+        } else if (!ocupadas.isEmpty()) {
             mensaje.accept("Las horas marcadas como ocupadas no están disponibles para ese médico en esa fecha.");
         }
     }
@@ -320,6 +335,8 @@ public class PanelCitas extends JPanel implements Refrescable {
         ajustando = true;
         seleccionado = null;
         estadoSeleccionado = null;
+        fechaSeleccionada = null;
+        horaPropia = null;
         cmbPaciente.limpiar();
         cmbMedico.limpiar();
         txtFecha.setText("");
@@ -364,7 +381,12 @@ public class PanelCitas extends JPanel implements Refrescable {
             return;
         }
         try {
-            citaDao.actualizar(c);
+            if (!citaDao.actualizar(c)) {
+                Dialogos.aviso(this, "La cita ya no está en estado Programada, por eso no se puede modificar.");
+                limpiar();
+                cargarAgenda();
+                return;
+            }
             limpiar();
             cargarAgenda();
             mensaje.accept("Cita modificada correctamente.");
@@ -397,6 +419,10 @@ public class PanelCitas extends JPanel implements Refrescable {
             Dialogos.aviso(this, "Solo las citas en estado Programada pueden marcarse como atendidas.");
             return;
         }
+        if (fechaSeleccionada != null && fechaSeleccionada.isAfter(LocalDate.now())) {
+            Dialogos.aviso(this, "No se puede marcar como atendida una cita con fecha futura.");
+            return;
+        }
         if (!Dialogos.confirmar(this, "¿Confirma que la consulta de esta cita ya fue atendida?")) {
             return;
         }
@@ -405,7 +431,12 @@ public class PanelCitas extends JPanel implements Refrescable {
 
     private void cambiarEstado(String nuevoEstado, String textoExito) {
         try {
-            citaDao.cambiarEstado(seleccionado, nuevoEstado);
+            if (!citaDao.cambiarEstado(seleccionado, nuevoEstado)) {
+                Dialogos.aviso(this, "La cita ya no está en estado Programada, por eso no se puede cambiar su estado.");
+                limpiar();
+                cargarAgenda();
+                return;
+            }
             limpiar();
             cargarAgenda();
             mensaje.accept(textoExito);
@@ -418,6 +449,8 @@ public class PanelCitas extends JPanel implements Refrescable {
         ajustando = true;
         seleccionado = c.id();
         estadoSeleccionado = c.estado();
+        fechaSeleccionada = c.fecha();
+        horaPropia = c.hora();
         cmbPaciente.seleccionarPorId(c.idPaciente());
         cmbMedico.seleccionarPorId(c.idMedico());
         txtFecha.setFecha(c.fecha());
@@ -449,8 +482,41 @@ public class PanelCitas extends JPanel implements Refrescable {
             Dialogos.aviso(this, "La fecha no es válida. Use el formato dd/mm/aaaa.");
             return null;
         }
+        if (fecha.isBefore(LocalDate.now())) {
+            Dialogos.aviso(this, "No se pueden programar citas en fechas pasadas.\nElija la fecha de hoy o una fecha futura.");
+            txtFecha.requestFocusInWindow();
+            return null;
+        }
+        if (fecha.isAfter(LocalDate.now().plusYears(1))) {
+            Dialogos.aviso(this, "Solo se pueden programar citas hasta un año hacia adelante (máximo "
+                    + LocalDate.now().plusYears(1).format(FORMATO_FECHA) + ").");
+            txtFecha.requestFocusInWindow();
+            return null;
+        }
+        if (fecha.equals(LocalDate.now()) && hora.isBefore(LocalTime.now())) {
+            Dialogos.aviso(this, "La hora seleccionada ya pasó. Elija una hora posterior a la actual.");
+            return null;
+        }
+        String motivo = txtMotivo.getText().trim();
+        if (motivo.length() > 200) {
+            Dialogos.aviso(this, "El motivo no puede superar los 200 caracteres.");
+            txtMotivo.requestFocusInWindow();
+            return null;
+        }
+        if (!Validador.motivoCaracteresValidos(motivo)) {
+            Dialogos.aviso(this, "El motivo solo puede contener letras, números y signos básicos de puntuación "
+                    + "(. , ; : ( ) ¿ ? ¡ ! / % & # + - ' \").");
+            txtMotivo.requestFocusInWindow();
+            return null;
+        }
+        if (!Validador.motivoLegible(motivo)) {
+            Dialogos.aviso(this, "El motivo debe ser legible: escriba al menos 3 letras y evite repetir "
+                    + "un mismo carácter 4 o más veces seguidas.");
+            txtMotivo.requestFocusInWindow();
+            return null;
+        }
         return new Cita(id, paciente.id(), medico.id(), paciente.texto(), medico.texto(),
-                fecha, hora, txtMotivo.getText().trim(), EstadoCita.PROGRAMADA);
+                fecha, hora, motivo, EstadoCita.PROGRAMADA);
     }
 
     private void errorBD(SQLException e) {
@@ -462,4 +528,3 @@ public class PanelCitas extends JPanel implements Refrescable {
         }
     }
 }
-    

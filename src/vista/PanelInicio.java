@@ -54,7 +54,7 @@ public class PanelInicio extends JPanel {
                 Tema.suavizar(g);
                 g.setColor(Tema.VERDE_CLARO);
                 g.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 12, 12);
-                g.setColor(new Color(0xD3EBDB));
+                g.setColor(Tema.BORDE_VERDE);
                 g.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 12, 12);
                 g.dispose();
             }
@@ -88,7 +88,7 @@ public class PanelInicio extends JPanel {
                 Tema.suavizar(g);
                 g.setColor(Color.WHITE);
                 g.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 12, 12);
-                g.setColor(new Color(0xD3EBDB));
+                g.setColor(Tema.BORDE_VERDE);
                 g.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 12, 12);
                 g.setColor(Tema.VERDE);
                 g.fillRoundRect(16, 18, 30, 30, 8, 8);

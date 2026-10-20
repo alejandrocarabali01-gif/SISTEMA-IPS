@@ -32,9 +32,10 @@ import javax.swing.text.JTextComponent;
 /** Colores, fuentes y utilidades de diseño comunes a todas las pantallas. */
 public final class Tema {
     public static final Color FONDO = new Color(0xF3F4F6);
-    public static final Color VERDE = new Color(0x1E9E4A);
-    public static final Color VERDE_OSCURO = new Color(0x15803D);
-    public static final Color VERDE_CLARO = new Color(0xE8F5EC);
+    public static final Color VERDE = new Color(0x3F8261);
+    public static final Color VERDE_OSCURO = new Color(0x2F6B4F);
+    public static final Color VERDE_CLARO = new Color(0xEDF4F0);
+    public static final Color BORDE_VERDE = new Color(0xD5E5DB);
     public static final Color AZUL = new Color(0x2563EB);
     public static final Color ROJO = new Color(0xDC2626);
     public static final Color TEXTO = new Color(0x111827);
