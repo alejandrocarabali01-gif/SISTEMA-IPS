@@ -20,7 +20,7 @@ public class Logo extends JComponent {
 
     public Logo(int tam) {
         setPreferredSize(new Dimension(tam, tam));
-        URL url = Logo.class.getResource("/recursos/logo.png");
+        URL url = Logo.class.getResource("/imagenes/logo.jpeg");
         if (url != null) {
             imagen = new ImageIcon(url).getImage();
         }
