@@ -1,5 +1,0 @@
-/build/
-/dist/
-/nbproject/private/
-/nbproject/build-impl.properties
-/nbproject/genfiles.properties
