@@ -12,9 +12,9 @@ public class ConexionDB {
 
     private static final String HOST = "localhost";
     private static final String PUERTO = "3307";
-    private static final String BASE_DATOS = "ips_unicatolica";
+    private static final String BASE_DATOS = "nombre_base_de_datos";
     private static final String USUARIO = "root";
-    private static final String CLAVE = "ingeniero"; 
+    private static final String CLAVE = "tu_clave_aqui"; 
 
     private static final String URL = "jdbc:mysql://" + HOST + ":" + PUERTO + "/" + BASE_DATOS
             + "?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Bogota";
