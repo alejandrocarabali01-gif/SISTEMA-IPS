@@ -6,7 +6,7 @@
 Name "${APP_NAME}"
 OutFile "Instalador_IPS_Unicatolica.exe"
 
-; Instala directamente en la carpeta local del usuario para evitar bloqueos de permisos
+; Instala directamente en la carpeta local del usuario para evitar requerir permisos de administrador
 InstallDir "$LOCALAPPDATA\IPS Unicatolica"
 
 !insertmacro MUI_PAGE_DIRECTORY
@@ -22,13 +22,16 @@ InstallDir "$LOCALAPPDATA\IPS Unicatolica"
 Section "Instalar Aplicacion"
     SetOutPath "$INSTDIR"
     
-    ; Fuerza a empaquetar el JAR especificamente
+    ; Empaquetar el ejecutable JAR
     File "${MAIN_JAR}"
     
-    ; Si existe la carpeta lib la copia opcionalmente, si no existe no falla la compilacion
+    ; Empaquetar el archivo de configuración externa
+    File /nonfatal "config.properties"
+    
+    ; Empaquetar la carpeta de librerías (Connector JDBC)
     File /nonfatal /r "lib"
     
-    ; Crea el acceso directo en el Escritorio apuntando a la ruta del usuario
+    ; Crear el acceso directo en el Escritorio
     CreateShortCut "$DESKTOP\${APP_NAME}.lnk" "javaw.exe" '-jar "$INSTDIR\${MAIN_JAR}"' "$INSTDIR"
 SectionEnd
 

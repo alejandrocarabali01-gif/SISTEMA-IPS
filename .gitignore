@@ -1,2 +1,10 @@
-"build/" 
-"dist/" 
+# Excluir archivos compilados dinámicos
+/build/
+/nbproject/private/
+
+# Excluir el config.properties de tu entorno local de desarrollo (puerto 3307 / clave)
+config.properties
+
+# Excluir instaladores compilados si prefieres no saturar el código
+dist/*.exe
+dist/*.zip
